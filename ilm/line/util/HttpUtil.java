@@ -1,0 +1,240 @@
+/*
+ * iTangram2 - Interactive/Internet Tangram: http://www.matematica.br/itangram
+ * 
+ * Free interactive solutions to teach and learn
+ * 
+ * iMath Project: http://www.matematica.br
+ * LInE           http://line.ime.usp.br
+ *
+ * @author Tulio Faria <tuliofaria@gmail.com> / LOB
+ *
+ * @description Class for HTTP utilities
+ * 
+ * @see 
+ *  
+ * @credits
+ * This source is free and provided by iMath Project (University of São Paulo - Brazil). In order to contribute, please
+ * contact the iMath coordinator Leônidas O. Brandão.
+ *
+ * O código fonte deste programa é livre e desenvolvido pelo projeto iMática (Universidade de São Paulo). Para contribuir,
+ * por favor contate o coordenador do projeto iMatica, professor Leônidas O. Brandão.
+ * 
+ */
+
+package ilm.line.util;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.swing.JOptionPane;
+
+
+public class HttpUtil {
+
+  public static String METHOD_POST = "POST";
+  public static String METHOD_POST_MULTIDATA = "PostMultidata";
+  public static String METHOD_GET = "GET";
+  private Map queryStringVars;
+  private Map postVars;
+  private Map uploadFiles;
+  private String boundary = "";
+  private String outputContent = "";
+  private OutputStream output;
+
+  public HttpUtil () {
+    queryStringVars = new HashMap();
+    postVars = new HashMap();
+    uploadFiles = new HashMap();
+    }
+
+  public void addQueryStringVariable (String name, String value) {
+    queryStringVars.put(name, value);
+    }
+
+  public void addPostVariable (String name, String value) {
+    postVars.put(name, value);
+    }
+
+  public void addFile (String fieldname, String filename, Object file) {
+    Map fileData = new HashMap();
+    fileData.put("filename", filename);
+    fileData.put("file", file);
+    uploadFiles.put(fieldname, fileData);
+    }
+
+  private HttpURLConnection createConnection (String method, String destinationUrl) throws Exception {
+    URL url = null;
+    HttpURLConnection httpConn = null;
+    int code = -1;
+    try {
+      String queryString = getQueryString();
+      if (!queryString.equals("")) {
+        destinationUrl = destinationUrl + "?" + queryString;
+      }
+      url = new URL(destinationUrl);
+
+      httpConn = (HttpURLConnection) url.openConnection();
+      if (uploadFiles.size() > 0) {
+        method = METHOD_POST_MULTIDATA;
+      }
+      if (method.equals(METHOD_POST_MULTIDATA)) {
+        httpConn.setRequestMethod("POST");
+      } else {
+        httpConn.setRequestMethod(method);
+        }
+
+      httpConn.setUseCaches(false);
+
+      if ((uploadFiles.size() > 0) && (postVars.size() > 0)) {
+        httpConn.setDoInput(true);
+        }
+      httpConn.setDoOutput(true);
+      httpConn.setRequestProperty("Connection", "Keep-Alive");
+
+      // use multipart if has to upload files
+      if ((method.equals(METHOD_POST_MULTIDATA)) || (method.equals(METHOD_POST))) {
+        boundary = Long.toHexString(System.currentTimeMillis());
+        httpConn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+        }
+      // TODO calcular
+      //httpConn.addRequestProperty("Content-length", contentStrPck.size() + "");
+      String CHARSET = "UTF8";
+      httpConn.connect();
+      PrintWriter writer = null;
+
+      output = httpConn.getOutputStream(); //exception throws here
+      writer = new PrintWriter(new OutputStreamWriter(output, CHARSET), true); // true = autoFlush, important!
+
+      sendPostVariables(writer, CHARSET);
+      uploadFiles(writer);
+
+      InputStreamReader in = new InputStreamReader((InputStream) httpConn.getContent());
+      BufferedReader buff = new BufferedReader(in);
+      String line;
+      String text = "";
+      do {
+        line = buff.readLine();
+        text += line + "\n";
+      } while (line != null);
+      outputContent = text;
+
+      return httpConn;
+    } catch (IOException io) {
+      System.err.println("HttpUtil.java: createConnection: (1) destinationUrl=" + destinationUrl + ": " + io.toString());
+      // throw new Exception("Server not found.");
+      io.printStackTrace();
+    } catch (Exception e) {
+      System.err.println("HttpUtil.java: createConnection: (2) destinationUrl=" + destinationUrl + ": " + e.toString());
+      e.printStackTrace();
+      }
+    return null;
+    }
+
+  private String getQueryString () {
+    String retorno = "";
+    Set keySet = queryStringVars.keySet();
+
+    java.util.Iterator listIterator = keySet.iterator();
+    while (listIterator.hasNext()) {
+      // (Object objKey : keySet)
+      Object objKey = listIterator.next();
+      retorno += "&" + objKey + "=" + queryStringVars.get(objKey);
+      }
+
+    if (!retorno.equals("")) {
+      retorno = retorno.substring(1);
+      }
+    return retorno;
+    }
+
+  public String getResponse () {
+    return outputContent;
+    }
+
+  public void makePostRequest (String url) throws Exception {
+    createConnection("POST", url);
+    }
+  public void makeGetRequest (String url) throws Exception {
+    createConnection("GET", url);
+    }
+
+  private void sendPostVariables (PrintWriter writer, String charset) {
+    Set keySet = postVars.keySet();
+
+    java.util.Iterator listIterator = keySet.iterator();
+    while (listIterator.hasNext()) {
+      // (Object objKey : keySet)
+      Object objKey = listIterator.next();
+
+      writer.println("--" + boundary);
+      writer.println("Content-Disposition: form-data; name=\"" + objKey + "\"");
+      writer.println("Content-Type: text/plain; charset=" + charset);
+      writer.println();
+      writer.println(postVars.get(objKey));
+      }
+    }
+
+  private void uploadFiles (PrintWriter writer) {
+    Set keySet = uploadFiles.keySet();
+    if (keySet==null) {
+      System.err.println("HttpUtil.java: uploadFiles: uploadFiles.keySet vazio");
+      return;
+      }
+    java.util.Iterator listIterator = keySet.iterator();
+    while (listIterator.hasNext()) {
+      // (Object objKey : keySet)
+      Object objKey = listIterator.next();
+      
+      Map fileData = (HashMap) uploadFiles.get(objKey);
+      writer.println("--" + boundary);
+      writer.println("Content-Disposition: form-data; name=\""+objKey+"\"; filename=\""+fileData.get("filename")+"\"");
+      writer.println("Content-Transfer-Encoding: binary");
+      writer.println();
+      InputStream input = null;
+      try {
+        if (fileData.get("file") instanceof File) {
+          input = new FileInputStream((File) fileData.get("file"));
+        } else if (fileData.get("file") instanceof byte[]) {
+          input = new ByteArrayInputStream((byte[]) fileData.get("file"));
+          }
+
+        byte [] buffer = new byte[1024];
+        for (int length = 0; (length = input.read(buffer)) > 0;) {
+          output.write(buffer, 0, length);
+          }
+        output.flush(); // Important! Output cannot be closed. Close of writer will close output as well.
+      } catch (IOException e) {
+        e.printStackTrace();
+      } finally {
+        if (input != null) {
+          try {
+            input.close();
+          } catch (IOException logOrIgnore) {
+            logOrIgnore.printStackTrace();
+            }
+          }
+        }
+      writer.println(); // Important! Indicates end of binary boundary.
+
+      // End of multipart/form-data.
+      writer.println("--" + boundary + "--");
+
+     }
+    }
+
+ }

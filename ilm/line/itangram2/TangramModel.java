@@ -1,0 +1,301 @@
+/*
+ * iTangram2 - Interactive/Internet Tangram: http://www.matematica.br/itangram
+ *
+ * Free interactive solutions to teach and learn
+ *
+ * iMath Project: http://www.matematica.br
+ * LInE           http://line.ime.usp.br / http://www.usp.br/line
+ *
+ * @author  Leo^nidas/LInE-IME-USP / Adapted from Tangram by Serge
+ *
+ * @description
+ *
+ * @see
+ *
+ * @credits
+ * This source is free and provided by iMath Project (University of São Paulo - Brazil). In order to contribute, please
+ * contact the iMath coordinator Leônidas O. Brandão.
+ * The original code is from 'javapage@serger.biz'.
+ *
+ * O co'digo fonte deste programa e' livre e desenvolvido pelo projeto iMa'tica (Universidade de Sa~o Paulo). Para contribuir,
+ * por favor contate o coordenador do projeto iMatica, professor Leo^nidas O. Branda~o.
+ * Este sistema foi baseado no co'digo original de 'javapage@serger.biz'.
+ *
+ */
+
+package ilm.line.itangram2;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.util.*;
+import java.applet.*;
+
+
+class TangramModel extends Panel {
+
+  private static final int WIDTH = 260, HEIGHT = 320;
+  private static final int DX = 2, DY = 2; // extra shifting to model answer
+
+  //----------------------------------------------------------------------------
+  //  Data
+  //----------------------------------------------------------------------------
+  private Tangram tangram;
+  private TangramPosition modelPosition;
+  private TangramModelData modelData;
+  private int xmargin = 0;
+  private int ymargin = 0;
+
+  public  TangramPosition getTangramPosition () { return modelPosition; }
+
+  //----------------------------------------------------------------------------
+  //  Constructor
+  //----------------------------------------------------------------------------
+  public TangramModel (Tangram tangram) {
+    super();
+
+    this.tangram = tangram;
+    // TangramPosition.java: int [][] composingUnits
+    // TangramPosition modelPosition: getComposingUnits(): return composingUnits
+    modelData = new TangramModelData();
+
+    try {
+      modelData.loadFromProperties(tangram);
+    } catch (Exception e) {
+      if (ilm.line.itangram2.Tangram.ISDEBUG)
+        System.err.println(this.getClass().getName() + ": TangramModel(Tangram): modelData.loadFromProperties()");
+      System.err.println("Exception Caught Loading the Models: " + e);
+      e.printStackTrace();
+      }
+
+    modelPosition = new TangramPosition(); // TangramPosition.java: int [][] composingUnits
+    setBackground(TangramProperties.MODEL_BACKGROUND_COLOR);
+
+    } // public TangramModel(Tangram tangram)
+
+
+  // Auxiliary: get model as String
+  public String getCurrentModel () throws Exception {
+    return modelData.getCurrentModel();
+    }
+  // Auxiliary: get model description (TangramControls.java)
+  public String getModelDescription () throws Exception {
+    return modelData.getModelDescription();
+    }
+  // Auxiliary: get model description (TangramControls.java)
+  // Define 'TangramModelData.positions[0]' and 'TangramModelData.descriptions[0]'
+  public void setCurrentModel (String strPosition, String strDescription) throws Exception {
+    modelData.setPosition(strPosition);
+    modelData.setDescription(strDescription);
+    }
+
+
+  //----------------------------------------------------------------------------
+  //  Load a model from a String: from ilm.line.itangram2.TangramControls.actionPerformed(...)
+  //----------------------------------------------------------------------------
+  public void loadModelPosition (String modelString) throws Exception {
+    modelPosition.loadFromString(modelString, "model");
+    computeMargin(); // set a nice margin to draw pieces
+
+    String strOldModel = null;
+    // Tangram: Properties itangramProperties
+    if (Tangram.ISDEBUG) { // this.tangram.itangramProperties
+      if (this.tangram.getProperties("model")==null) {
+        System.out.println("TangramModel.java: loadModelPosition(" + modelString + "): property model undefined");
+        this.tangram.setProperties("model", "");
+	}
+      strOldModel = this.tangram.getProperties("model");
+      }
+
+    this.tangram.setProperties("model", modelString); // update property "model" in Tangram instance (Properties itangramProperties)
+
+    if (Tangram.ISDEBUG)
+      System.out.println("TangramModel.java: loadModelPosition(" + modelString + "): getProperties(\"model\") changed from: " + strOldModel +
+                         ", to: " + this.tangram.getProperties("model") + "\n----------");
+
+    repaint();
+    }
+
+
+  public String loadCurrentModel () throws Exception {
+    loadModelPosition(modelData.getCurrentModel());
+    return modelData.getModelDescription();
+    }
+  public String loadPrevModel() throws Exception {
+    loadModelPosition(modelData.getPrevModel());
+    return modelData.getModelDescription();
+    }
+  public String loadNextModel() throws Exception {
+    loadModelPosition(modelData.getNextModel());
+    return modelData.getModelDescription();
+    }
+
+
+  //----------------------------------------------------------------------------
+  //  Paint the model on this panel
+  //----------------------------------------------------------------------------
+
+  private Image    offscreenImage = null;     //DB: Place to hold Image
+  private Graphics offscreenGraphics;  //DB: The second graphics context of offscreenImage
+  private Dimension lastDimension = null;
+
+
+  //----------------------------------------------------------------------------
+  //  Compute Margins
+  //----------------------------------------------------------------------------
+  private void computeMargin () {
+    int [] vectorMins = findCorrectTopCorner(modelPosition.getComposingUnits());
+
+    if (vectorMins==null) { // empty model => stundent must provide some free draw
+      return;
+      }
+
+    // Margin in Model
+    xmargin = TangramProperties.TANGRAM_MODEL_DISPLAY_MARGIN - vectorMins[0] + DX; // TangramProperties.TANGRAM_MODEL_DISPLAY_MARGIN - minx + DX
+    ymargin = TangramProperties.TANGRAM_MODEL_DISPLAY_MARGIN - vectorMins[1] + DY; // TangramProperties.TANGRAM_MODEL_DISPLAY_MARGIN - miny + DY
+
+    //System.out.println("src/ilm/line/itangram2/TangramModel.java: computeMargin(): "+TangramProperties.TANGRAM_MODEL_DISPLAY_MARGIN+","+TangramProperties.TANGRAM_MODEL_DISPLAY_MARGIN+" - "+vectorMins[0]+","+vectorMins[1]);
+    // if (Tangram.ISDEBUG) System.out.println("src/ilm/line/itangram2/TangramModel.java: computeMargin(): model positioning: xmargin=" + xmargin + ", ymargin=" + ymargin);
+    } // private void computeMargin()
+
+
+  //----------------------------------------------------------------------------
+  //  Compute Margin: find margins
+  //----------------------------------------------------------------------------
+  private static int [] findCorrectTopCorner (int [][] piecesComposingUnitsParam) {
+    int xmin = 0, ymin = 0;
+    int xpoint = 0, ypoint = 0;
+    int [] translationToCorrect = { 0,0, 0,0, };
+
+    // piecesComposingUnitsParam.length==32 => from model => uses "basic triangles" (big triangle with 8 and small with 2)
+    //DEBUG if (piecesComposingUnitsParam.length==7)
+    //try { String str__=""; System.out.print(str__.charAt(3)); } catch (Exception except) { except.printStackTrace(); }
+    // System.out.println("src/ilm/line/itangram2/TangramModel.java: findCorrectTopCorner");
+    if (piecesComposingUnitsParam==null) { // empty model => stundent must provide some free draw
+      return null;
+      }
+
+    for (int cnt=0; cnt < piecesComposingUnitsParam.length; cnt++) {
+
+      // "Basic triangles" are identified by the x and y coordinates of its right angle vertex: (0,0), (0,1), (1,0)
+      // (x_coord, y_coord, alpha) are the translation+rotation from original position (0,0)
+      int x_coord = piecesComposingUnitsParam[cnt][0]; // coodinate X
+      int y_coord = piecesComposingUnitsParam[cnt][1]; // coodinate Y
+      int alpha   = piecesComposingUnitsParam[cnt][2]; // rotation
+
+      // Rotation
+      double radians = Math.PI * alpha / 180; // [ x1 ]   [ cosinus   -sinus] [ x0 ]
+      double cosinus = Math.cos(radians);     // [    ] = [                 ] [    ]
+      double sinus   = Math.sin(radians);     // [ y1 ]   [ sinus    cosinus] [ y0 ]
+
+      // Getting the minimums for x and y
+      // Right Angle
+      xpoint = (x_coord) / 2;
+      ypoint = (y_coord) / 2;
+      if (xpoint < xmin) { xmin = xpoint; }
+      if (ypoint < ymin) { ymin = ypoint; };
+      // Angle 2
+      xpoint = (x_coord + (int) Math.round( cosinus * 2*TangramProperties.unit )) / 2;
+      ypoint = (y_coord + (int) Math.round( -sinus  * 2*TangramProperties.unit )) / 2;
+      if (xpoint < xmin) { xmin = xpoint; }
+      if (ypoint < ymin) { ymin = ypoint; }
+      // Angle 3
+      xpoint = (x_coord + (int) Math.round( sinus   * 2*TangramProperties.unit )) / 2;
+      ypoint = (y_coord + (int) Math.round( cosinus * 2*TangramProperties.unit )) / 2;
+      if (xpoint < xmin) { xmin = xpoint; }
+      if (ypoint < ymin) { ymin = ypoint; }
+
+      } // for (int cnt=0; cnt < piecesComposingUnitsParam.length; cnt++)
+
+    int xmargin = TangramProperties.TANGRAM_MODEL_DISPLAY_MARGIN - xmin,
+        ymargin = TangramProperties.TANGRAM_MODEL_DISPLAY_MARGIN - ymin;
+
+    translationToCorrect[0] = xmin;
+    translationToCorrect[1] = ymin;
+
+    return translationToCorrect;
+    } // protected static int [] findCorrectTopCorner(int [][] piecesComposingUnitsParam)
+
+
+  // Draw each iTangram pieces
+  private void paintUnitaryTriangle (int x_coord, int y_coord, int alpha, Graphics graph) {
+
+    double radians = Math.PI * alpha / 180;
+    double cosinus = Math.cos(radians);
+    double sinus   = Math.sin(radians);
+
+    int [] xpoints = new int[3];
+    int [] ypoints = new int[3];
+
+    // The model is scaled to half of the real size.
+    // Right Angle
+    xpoints[0] = (x_coord) / 2;
+    ypoints[0] = (y_coord) / 2;
+    // Angle 2
+    xpoints[1] = (x_coord + (int) Math.round( cosinus * 2*TangramProperties.unit )) / 2;
+    ypoints[1] = (y_coord + (int) Math.round( -sinus  * 2*TangramProperties.unit )) / 2;
+    // Angle 3
+    xpoints[2] = (x_coord + (int) Math.round( sinus   * 2*TangramProperties.unit )) / 2;
+    ypoints[2] = (y_coord + (int) Math.round( cosinus * 2*TangramProperties.unit )) / 2;
+
+    Polygon triangle = new Polygon(xpoints, ypoints, 3);
+
+    triangle.translate(xmargin, ymargin);
+
+    offscreenGraphics.setColor(TangramProperties.MODEL_FILL_COLOR); //DB
+    offscreenGraphics.fillPolygon(triangle); //DB
+    } //  private void paintUnitaryTriangle(int x_coord, int y_coord, int alpha, Graphics graph)
+
+
+  public void paint (Graphics graph) {
+    this.setSize(TangramProperties.TANGRAM_MODEL_PANEL_WIDTH, TangramProperties.TANGRAM_MODEL_PANEL_HEIGTH);
+    Dimension size = this.getSize(); // get the size
+    // 260 x 260
+    //D System.out.println("TangramModel.java: " + size.getWidth() + "," + size.getHeight());
+
+    // Paint the current model position.
+    // TangramPosition.java: private int [][] composingUnits: #piecesComposingUnits = 32
+    //  { 2 * LargeTriangle, MediumTriangle, 2 * SmallTriangle, Square, Lozange } => # = { 8, 8, 4, 2, 2, 4, 4 } => # = 32 "basic triangles"
+    //  A small triangle has 2 "basic triangles" => Square has 2 SmallTriangle => Square has 4 "basic triangles"
+    int [][] piecesComposingUnits = modelPosition.getComposingUnits(); // TangramPosition modelPosition: getComposingUnits(): return composingUnits
+
+    if (piecesComposingUnits==null) { // empty model => stundent must provide some free draw
+      return;
+      }
+
+    if (offscreenImage == null) try {
+      offscreenImage = this.createImage(size.width, size.height);
+      lastDimension = size;
+      // offscreenImage = this.createImage(WIDTH,HEIGHT);
+      offscreenGraphics = offscreenImage.getGraphics();
+    } catch (Exception e) {
+      System.err.println("TangramPanel.updateOffscreenImage(): size=" + size);
+      e.printStackTrace();
+      }
+    else { // dimension changed => change panel model
+      if (!size.equals(lastDimension)){
+        lastDimension = size;
+        offscreenImage = this.createImage(size.width, size.height);
+        offscreenGraphics = offscreenImage.getGraphics();
+        }
+      }
+
+    // Clear
+    offscreenGraphics.setColor(TangramProperties.MODEL_BACKGROUND_COLOR);
+    offscreenGraphics.fillRect(1, 1, size.width-1, size.height-1);
+
+    // Draw light border
+    offscreenGraphics.setColor(TangramProperties.TANGRAM_PANEL_BACKGROUND_BORDER);
+    offscreenGraphics.drawRect(0, 0, size.width-1, size.height-1);
+
+    //_ System.out.println("src/ilm/line/itangram2/TangramModel.java: paint: modelPosition.id=" + modelPosition.id + ": #piecesComposingUnits=" + piecesComposingUnits.length);
+
+    for (int cnt=0; cnt < piecesComposingUnits.length; cnt++) {
+      paintUnitaryTriangle(piecesComposingUnits[cnt][0], piecesComposingUnits[cnt][1], piecesComposingUnits[cnt][2], graph);
+      }
+
+    graph.drawImage(offscreenImage,0,0,this); //DB
+
+    } // public void paint(Graphics graph)
+
+
+  } // class TangramModel extends Panel
