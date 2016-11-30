@@ -395,12 +395,11 @@ System.out.println("\n\n\nTangramPanel.java: translatePiece: " + selection.getNa
        }
 
      //+++++++++++++++++++++++++++++++++++++
-     // SURVIVAL SPADES MODIFICATION:
-     // Compare with the model
+     // Compare with the model: "false" => evaluate after a movement; true => show to the learner (if allowed) the congratulation if correct
      //+++++++++++++++++++++++++++++++++++++
-     boolean result = tangram.comparePositionWithModel(true); // true => show to the learner (if allowed) the congratulation if correct
+     boolean result = tangram.comparePositionWithModel(false, true);
      if (result) // problem solved and if in mode 'point-click' (with piece in move) => release the piece!
-      tangramPieceOnMove = null;
+       tangramPieceOnMove = null;
 
      if (tangramPieceOnMove!=null && !onDrag && onMove) { onMove = false; }
      else if (selectedPiece!=null && onDrag) { onDrag = false; }

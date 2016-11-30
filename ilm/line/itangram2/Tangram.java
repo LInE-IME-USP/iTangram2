@@ -58,7 +58,8 @@ public class Tangram extends Applet implements ActionListener {
   public static final String  DEFAULTPOSITION0 = "eMEkDAiUm4iGNLdUyF001y41AYOV"; // default position of pieces in working area
 
   public static final String path = "ilm.line.itangram2"; //DEBUG: set true whenever testing iTangram2
-  public static final String VERSION = "0.4.5";
+  public static final String VERSION = "0.4.6";
+  // 0.4.6: 30/11/2016 - now iTangram print help message to the user (with control panel activated) to see the distance between the "answer model" gainst the "current positioning"
   // 0.4.5: 24/03/2016 - fixed update in 'Tangram.itangramProperties' property "model" after to define new mode ("Set code") - mainly to work with iAssign online editor
   // 0.4.4: 22/03/2016 - more adjusts in positioning, size of working area and Model, new messages
   // 0.4.3: 29/10/2013 - more adjusts in positioning (removed first useless read that was broken the effect second)
@@ -182,7 +183,9 @@ public class Tangram extends Applet implements ActionListener {
   // iLM essential method: get the iTangram evaluation
   //------------------------------------------------------------------
   public double getEvaluation () {
-    if (comparePositionWithModel(false)) // compare positioning with the "answer model"; do not show the single message "correct/wrong"
+    // Compare positioning with the "answer model":
+    // "true" => came from "eval button" click; "false" => do not show the single message "correct/wrong"
+    if (comparePositionWithModel(true, false))
       return 1; // correct => 1
     return 0; // incorrect => 0
     }
@@ -192,7 +195,7 @@ public class Tangram extends Applet implements ActionListener {
     boolean hasProperties = itangramProperties!=null; //TODO: for now, not null => came from file... (manual edition!)
     String strPosition0 = tangrampanel.getTangramPosition().writeToString(); // this can not be empty!
     // String strPosition0 = (String) itangramProperties.get("position0"); // (String) tangram.itangramProperties.get("model"); // a  
-System.out.println("Tangram.java: getPosition(): " + strPosition0);
+    System.out.println("Tangram.java: getPosition(): " + strPosition0); //D
     return strPosition0;
     }
 
@@ -215,14 +218,20 @@ System.out.println("Tangram.java: getPosition(): " + strPosition0);
   
   //----------------------------------------------------------------------------
   //  Compare With Model
+  //  @calledby ilm/line/itangram2/TangramPanel.java: after each piece's movement
+  //            TangramPanelMouseListener.mouseReleased(MouseEvent)
+  //  @calledby ilm/line/itangram2/Tangram.java: after each click in the evaluation button
+  //            this.getEvaluation()
   //----------------------------------------------------------------------------
-  public boolean comparePositionWithModel (boolean fromTangramPanel) {
+  public boolean comparePositionWithModel (boolean fromEvalButton, boolean showEvalResult) {
     TangramPosition modlPos = getTangramModel().getTangramPosition(); // in 'TangramModel.java': TangramPosition modelPosition
     TangramPosition currPos = getTangramPanel().getTangramPosition();
     currPos.updateComposingUnits();
-    boolean result = (modlPos.equals(currPos));
-    if (result && showFeedback) { // iMA: with external button to "evaluate/send" do not show dialog
 
+    boolean result = (modlPos.equals(currPos, fromEvalButton)); // compare "answer model" against "current positioning"
+
+    //TODO: eliminate 'showEvalResult' in favor of 'showFeedback'?
+    if (result && showFeedback) { // iMA: with external button to "evaluate/send" do not show dialog
       //DEBUG try { String str__=""; System.out.print(str__.charAt(3)); } catch (Exception except) { except.printStackTrace(); }
 
       if (compareDialog == null) {
@@ -242,13 +251,13 @@ System.out.println("Tangram.java: getPosition(): " + strPosition0);
       compareDialog.setTitle(description);
       //D compareTextField.setText(getTangramPanel().getTangramPosition().writeToString());
 
-      if (fromTangramPanel)
+      if (showEvalResult)
         showCompareDialog(); // came from 'TangramPanel.mouseReleased(...)' => present the window with the congratulations
 
       } // if (result && showFeedback)
-    // System.out.println("Tangram.java: comparePositionWithModel(boolean): Compare Result = " + result);
+    // System.out.println("Tangram.java: comparePositionWithModel(boolean,boolean): Compare Result = " + result);
     return result;
-    } // public boolean comparePositionWithModel(boolean fromTangramPanel)
+    } // public boolean comparePositionWithModel(boolean showEvalResult, boolean showEvalResult)
 
 
   //---  Compare Dialog  -------------------------------

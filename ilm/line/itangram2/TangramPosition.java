@@ -36,13 +36,24 @@ class TangramPosition {
   //------------------------------------------------------------------------
   //  Get the Composing Units of an array of TangramPieces.
   //------------------------------------------------------------------------
+  // Number of 'unitary triangle' that compose eachr piece: ilm/line/itangram2/TangramPiece.java
+  // * 0 = "LargeTriangle"  : 8 = 2 "MediumTriangle" = 8 "basic triangles"
+  // * 1 = "LargeTriangle"  : 8
+  // * 2 = "MediumTriangle" : 4 = 2 "SmallTriangle"  = 4 "basic triangles"
+  // * 3 = "SmallTriangle"  : 2 =                      2 "basic triangles"
+  // * 4 = "SmallTriangle"  : 2
+  // * 5 = "Square"         : 4 = 2 "SmallTriangle"  = 4 "basic triangles"
+  // * 6 = "Lozange"        : 4 = 2 "SmallTriangle"  = 4 "basic triangles"
   static int [][] getComposingUnits (TangramPiece [] pieces) {
-   int [][] units = new int[32][];
+   int [][] units = new int[32][]; //
    int [][] currentPiece;
    int poscount = 0;
-
+     
+   //T System.out.println("TangramPosition.java: getComposingUnits(...):");
    for (int cnt = 0; cnt < pieces.length; cnt++) {
-     currentPiece = pieces[cnt].getComposingUnits(); // #currentPiece =8
+     // ilm/line/itangram2/TangramPiece.java: int[32][3], where second is 'rad=PI*rotation/180, cos(rad), sinus(rad)' (radians)
+     currentPiece = pieces[cnt].getComposingUnits();
+     //T System.out.println(" " + cnt + ": pieces.length=" + pieces.length + ": " + currentPiece.length);
      // Stuffing my array
      for (int ncnt = 0; ncnt < currentPiece.length; ncnt++) {
       units[poscount++] = currentPiece[ncnt];
@@ -52,6 +63,17 @@ class TangramPosition {
    return units;
    }
 
+  static int pieceByBasicTriangles (int i) {
+     if (i<8)  return 0; // LargeTriangle
+     if (i<16) return 1; // LargeTriangle
+     if (i<20) return 2; // MediumTriangle
+     if (i<22) return 3; // SmallTriangle
+     if (i<24) return 4; // SmallTriangle
+     if (i<28) return 5; // Square
+     //if (i<32)
+     return 6; // Lozange
+     }
+   
   //------------------------------------------------------------------------
   //  Translate the Composing Units or Pieces to the origin.
   //------------------------------------------------------------------------
@@ -184,7 +206,7 @@ class TangramPosition {
          //D System.out.println("TangramPosition.java: getMinXY(): final = ("+xmin+","+ymin+")\n");
          //D System.out.println( " " + ii_ + ": angle=" + angle + ": " + tangramPieces[ii_].getName() + ":" + getCorners(tangramPieces[ii_]));
          ymin -= TangramProperties.TRANS_YN; // extra shift to avoid the peak do not appears!
-	 }
+         }
 
        }
 
@@ -340,11 +362,16 @@ class TangramPosition {
 
   //----------------------------------------------------------------------------
   //  Test a passed-in position against this model
+  //  @calledby ilm/line/itangram2/Tangram.java: after each piece's movement (fromEvalButton=false) or after click in eval button (fromEvalButton=true)
+  //            boolean comparePositionWithModel(boolean fromTangramPanel): boolean result = (modlPos.equals(currPos, fromEvalButton));
   //----------------------------------------------------------------------------
-  public boolean equals (TangramPosition candidate) {
-   int [][] thisUnits = this.composingUnits;
-   int [][] candUnits = candidate.composingUnits;
-  
+  public boolean equals (TangramPosition candidate, boolean fromEvalButton) {
+   int [][] thisUnits = this.composingUnits; // from 'TangramPosition modlPos'
+   int [][] candUnits = candidate.composingUnits; // from 'TangramPosition currPos'
+
+   //D String str_=""; try { System.out.println(str_.charAt(3)); } catch (Exception e) { e.printStackTrace(); }
+
+   float dist_min = Float.POSITIVE_INFINITY, dist;
    boolean result = true;
    int [] currentTriangle;
 
@@ -352,17 +379,45 @@ class TangramPosition {
       return false;
       }
 
-   outer: for (int cnt1 = 0; cnt1 < thisUnits.length; cnt1++) {
-     inner: for (int cnt2 = 0; cnt2 < candUnits.length; cnt2++) {
-      if ( (thisUnits[cnt1][0] == candUnits[cnt2][0]) && 
-        (thisUnits[cnt1][1] == candUnits[cnt2][1]) && 
-        (thisUnits[cnt1][2] == candUnits[cnt2][2])    )
-      continue outer;
-      }
-     return false;
-     }
-   return true;
+   if (fromEvalButton) // came from evaluation button, presents the distance between "answer model" and "current positioning"
+     System.out.println("TangramPosition.java: equals(...): thisUnits.length=" + thisUnits.length); //DEBUG
 
+   // Try to match each piece from the model 'modlPos' with one from the 'currPos'
+   boolean error = false;
+   outer:
+   for (int cnt1 = 0; cnt1 < thisUnits.length; cnt1++) {
+     dist_min = Float.POSITIVE_INFINITY;
+     inner:
+     for (int cnt2 = 0; cnt2 < candUnits.length; cnt2++) { // this.composingUnits
+       dist = Math.abs(thisUnits[cnt1][0] - candUnits[cnt2][0]) + Math.abs(thisUnits[cnt1][1] - candUnits[cnt2][1]) + Math.abs(thisUnits[cnt1][2] - candUnits[cnt2][2]);
+       if (dist < dist_min)
+         dist_min = dist;
+       // if ( (thisUnits[cnt1][0] == candUnits[cnt2][0]) && (thisUnits[cnt1][1] == candUnits[cnt2][1]) && (thisUnits[cnt1][2] == candUnits[cnt2][2]) ) continue outer;
+       if (dist == 0) {
+         if (fromEvalButton) { // came from evaluation button, presents the distance between "answer model" and "current positioning"
+           int i = pieceByBasicTriangles(cnt1), j =  pieceByBasicTriangles(cnt2); // ilm/line/itangram2/TangramPiece.java: getName
+             System.out.println("TangramPosition.java: [" + cnt1 + "," + cnt2 + "] : piece " + i + " = " + j + " (" + this.tangramPieces[i].getName() + "=" + this.tangramPieces[j].getName() + ")"); //DEBUG
+           }
+         continue outer;
+         }
+       } // for (int cnt2 = 0; cnt2 < candUnits.length; cnt2++)
+
+     if (fromEvalButton) { // came from evaluation button, presents the distance between "answer model" and "current positioning"
+       // If for the piece cnt1 it is not equal, return false...
+       int i = pieceByBasicTriangles(cnt1); // ilm/line/itangram2/TangramPiece.java: getName
+       System.out.println("TangramPosition.java: not equals to piece " + i + " (" + this.tangramPieces[i].getName() + "): " + dist_min + ""); //DEBUG
+       // System.out.println("TangramPosition.java: not equals to piece cnt1=" + cnt1 + ": " + dist_min + "");
+       }
+
+     // return false;
+     error = true;
+
+     } // for (int cnt1 = 0; cnt1 < thisUnits.length; cnt1++)
+
+   System.out.println("TangramPosition.java: equals: " + dist_min); //DEBUG
+
+   if (error) return false;
+   return true;
    } //public boolean equals(TangramPosition candidate)
 
 

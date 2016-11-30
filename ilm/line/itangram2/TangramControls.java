@@ -242,10 +242,20 @@ public class TangramControls extends Panel {
     //---  Evaluate  -------------------------------------
     if (source == evaluateButton) { //DEBUG?
 
-System.out.println("\n-------------------------\nTangramControls.java: TangramControls: Tangram.EVALUATEBUTTON\n" + tangram.getAnswer() + "\n-------------------------\n");
+      System.out.println("\n-------------------------\nTangramControls.java: TangramControls: Tangram.EVALUATEBUTTON\n" + tangram.getAnswer() + "\n-------------------------\n"); //D
 
       evaluateButton.setSelected(true);
+
+      // Compare 'model' with 'current'
+      // + Tangram.java         :
+      //   double getEvaluation(): if (comparePositionWithModel(false)) return 1; else return 0;
+      //   boolean comparePositionWithModel(boolean fromTangramPanel):
+      //      TangramPosition modlPos = getTangramModel().getTangramPosition(), currPos = getTangramPanel().getTangramPosition();
+      //      currPos.updateComposingUnits(); boolean result = (modlPos.equals(currPos));
+      // + TangramPosition.java :
+      //   boolean equals(TangramPosition candidate): compare 'TangramPosition.composingUnits' for all 7 pieces and return true <=> equals
       boolean result = (tangram.getEvaluation()==1 ? true : false);
+
       String strEvaluationMsg = Bundle.msg("evalResultIs") + ": " + (result ? Bundle.msg("evalCorrect") : Bundle.msg("evalWrong")); // Result is: correct/wrong
       String strAnswerCode = tangram.getAnswer();
       if (ilm.line.itangram2.Tangram.ISDEBUG)
